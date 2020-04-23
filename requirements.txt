@@ -1,0 +1,6 @@
+numpy
+scipy
+opencv-python
+ipython
+matplotlib
+seaborn
