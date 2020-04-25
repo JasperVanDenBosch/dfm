@@ -1,4 +1,8 @@
 """
+
+below implementation is from wiki
+
+alt 1: http://vision.psych.umn.edu/users/kersten/kersten-lab/courses/Psy5036W2017/Lectures/17_PythonForVision/Demos/html/2b.Gabor.html
 """
 import numpy as np
 
