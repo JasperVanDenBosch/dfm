@@ -1,6 +1,8 @@
 """The key is to adapt the sigma and the kernel size to the lambda. Together they make up the SF
 
 very useful: http://matlabserver.cs.rug.nl/edgedetectionweb/web/edgedetection_params.html
+
+scale of kernel values wrt image also important
 """
 
 import cv2
@@ -13,7 +15,7 @@ import itertools
 
 plotdir = 'plots'
 img = cv2.imread('images/dog_200.png')   ## 3 channels, uint8
-img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) ## 1 channel, uint8
+img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255 ## 1 channel, uint8
 
 n_sfs = 10
 n_oris = 8
@@ -31,13 +33,14 @@ for f, (theta, sf) in enumerate(features):
     ## parameters
     theta = theta           ##  Orientation of the normal to the parallel stripes of a Gabor function.
     lambd = size/sf         ##  Wavelength of the sinusoidal factor.
-    sigma = 0.25*lambd  # 0.56   ##  Standard deviation of the gaussian envelope. 0.56*lambd
-    kside = 1 + (10 * int(ceil(lambd))) ##  Size of the filter returned.
-    gamma = 0.4             ##  Spatial aspect ratio. ("ellipsicity") 1 is round, 0 straight line
+    sigma = 0.56*lambd  # 0.56   ##  Standard deviation of the gaussian envelope. 0.56*lambd
+    kside = 1 + (15 * int(ceil(lambd))) ##  Size of the filter returned. should be a fn of sigma & lambda
+    gamma = 0.5             ##  Spatial aspect ratio. ("ellipsicity") 1 is round, 0 straight line
     psi = 0                 ##  Phase offset.
     ktype = cv2.CV_32F      ##  Type of filter coefficients. It can be CV_32F or CV_64F .(float32)
 
     kernel = cv2.getGaborKernel((kside, kside), sigma, theta, lambd, gamma, psi, ktype)
+
 
     ## filter
     filt_img = cv2.filter2D(img, -1, kernel)
@@ -54,7 +57,7 @@ for f, (theta, sf) in enumerate(features):
     else:
         kernel_imsize = kernel[offset:-offset, offset:-offset]
     axes[0].imshow(kernel_imsize, cmap='gray')
-    axes[1].imshow(filt_img, cmap='gray') # , vmin=0, vmax=255
+    axes[1].imshow(filt_img, cmap='gray', vmin=0, vmax=filt_img.max()) # , vmin=0, vmax=255
     axes[2].imshow(img, cmap='gray', vmin=0, vmax=255)
     fig.suptitle(f'{theta_degrees}°  {sf:.1f} cycles')
     plt.savefig(join(plotdir, f'{f+1}.png'))

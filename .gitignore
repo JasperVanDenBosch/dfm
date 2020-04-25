@@ -1,6 +1,9 @@
 # plot dir and contents
 plots/
 
+# matlab autosave files
+*~
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
