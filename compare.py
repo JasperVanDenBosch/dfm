@@ -1,15 +1,19 @@
-"""The key is to adapt the sigma and the kernel size to the lambda. Together they make up the SF
+"""compare.py
+This script is for testing the gabor image filtering and plotting the results
 
-very useful: http://matlabserver.cs.rug.nl/edgedetectionweb/web/edgedetection_params.html
+Things learned:
+- The key is to adapt the sigma and the kernel size to the lambda. Together they make up the SF
+- to get the magnitude must first filter the real and imaginary. Imaginary has offset of pi/2
 
-- todo: invert order of ori/sf
+Questions remaining:
+- must normalize filter?
+
+Resources:
+- http://matlabserver.cs.rug.nl/edgedetectionweb/web/edgedetection_params.html
 
 """
-
-import cv2
-import numpy
+import cv2, numpy, tqdm
 from numpy import pi, ceil
-import scipy.signal
 import matplotlib.pyplot as plt
 from os.path import join
 import itertools
@@ -21,8 +25,8 @@ n_sfs = 12
 n_oris = 6
 
 ## read image
-image = cv2.imread(img_fpath)     ## 3 channels, uint8
-image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)/255
+image = cv2.imread(img_fpath)                           ## 3 channels, uint8
+image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)/255     ## 1 channel float
 
 ## derived settings
 size = image.shape[0]
@@ -34,8 +38,7 @@ thetas = numpy.arange(n_oris) * (pi/n_oris)
 
 
 features = list(itertools.product(thetas, sfs))
-for f, (theta, sf) in enumerate(features):
-    print(f'{f+1}/{len(features)}')
+for f, (theta, sf) in enumerate(tqdm.tqdm(features, desc='filters')):
 
     ## parameters
     theta = theta           ##  Orientation of the normal to the parallel stripes of a Gabor function.
@@ -54,7 +57,7 @@ for f, (theta, sf) in enumerate(features):
     filt_imag = cv2.filter2D(image, -1, kernel_imag)
     filt_complex = filt_real + 1j * filt_imag
     filt_mag = numpy.abs(filt_complex)
-    filt_phase = numpy.angle(filt_complex)
+    # filt_phase = numpy.angle(filt_complex)
     # convenience
     filt_img = filt_mag
     kernel = kernel_real
