@@ -3,7 +3,7 @@
 Python implementation of ModelImageWithSmallGaborSet
 """
 # pylint: disable=no-member
-import cv2, numpy, tqdm, scipy.spatial
+import cv2, numpy, tqdm, scipy.spatial, pandas
 from scipy.stats import rankdata
 from numpy import pi, ceil
 import matplotlib.pyplot as plt
@@ -55,8 +55,10 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='kernel gain'):
     filt_imag = cv2.filter2D(image, -1, kernel_imag)
     gain[o, f, :, :] = numpy.abs(filt_real + 1j * filt_imag)
 
+features = []
 for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
     wavelength = size / frequencies[f]
+    gaussian_std = wavelength * bandwidth_constant
 
     ## a) pixels above threshold for this kernel
     kernel_pix_ranks = rankdata(gain[o, f, :, :]).reshape([size, size])
@@ -65,21 +67,42 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
     X, Y = numpy.where(kernel_top_pix & (best_ori==o))
 
     ## b) local maxima
-    maxima = []
     max_iterations = kernel_top_pix.sum()
     remaining = numpy.full_like(X, True, dtype=bool) #  remaining
     for _ in range(max_iterations):
         if ~remaining.any():
             break
         new_peak_index = gain[o, f, X[remaining], Y[remaining]].argmax()
-        new_peak_coords = (X[remaining][new_peak_index], Y[remaining][new_peak_index])
-        maxima.append(new_peak_coords)
+        x, y = (X[remaining][new_peak_index], Y[remaining][new_peak_index])
+        features.append(dict(o=o, f=f, theta=orientations[o], lambd=wavelength, sigma=gaussian_std, x=x, y=y))
         remaining_coords = numpy.array([X[remaining], Y[remaining]]).T
         dists = scipy.spatial.distance.cdist(
-            numpy.atleast_2d(new_peak_coords),
+            numpy.atleast_2d([x, y]),
             remaining_coords
         )
         too_close = numpy.squeeze(dists) <= (wavelength * min_dist_between_feats)
         remaining[remaining] = ~too_close
     else:
         raise ValueError('No convergence when finding local maxima')
+
+features = pandas.DataFrame(features)
+gaborvects = numpy.full([features.shape[0], size**2], numpy.nan)
+for f, feature in tqdm.tqdm(features.iterrows(), desc='construct features'):
+    kside = 1 + 2 * int(ceil(kernel_extent * feature.sigma))
+    kernel_params = dict(
+        ksize=(kside, kside),
+        sigma=feature.sigma,
+        theta=feature.theta,
+        lambd=feature.lambd,
+        gamma=gamma,
+        ktype=cv2.CV_32F
+    )
+    kernel = cv2.getGaborKernel(psi=0, **kernel_params)
+
+    canvas = numpy.zeros([size, size])
+    offset = abs(int((size-(kside-1))/2)) ## this only works if size is even
+    if kside < size:
+        canvas[offset-1:-offset, offset-1:-offset] = kernel
+    else:
+        canvas = kernel[offset:-offset, offset:-offset]
+    gaborvects[f, :] = canvas.ravel()

@@ -12,6 +12,7 @@ Resources:
 - http://matlabserver.cs.rug.nl/edgedetectionweb/web/edgedetection_params.html
 
 """
+# pylint: disable=no-member
 import cv2, numpy, tqdm
 from numpy import pi, ceil
 import matplotlib.pyplot as plt
