@@ -3,7 +3,8 @@
 Python implementation of ModelImageWithSmallGaborSet
 """
 # pylint: disable=no-member
-import cv2, numpy, tqdm
+import cv2, numpy, tqdm, scipy.spatial
+from scipy.stats import rankdata
 from numpy import pi, ceil
 import matplotlib.pyplot as plt
 from os.path import join
@@ -21,6 +22,8 @@ min_sf = 1.5                ## lowest spatial frequency in cyles / image
 gamma = 0.5                 ## spatial aspect ratio a.k.a "ellipsicity"; 1 is round, 0 straight line
 min_wavelength_pix = 4      ## smallest wavelength in pixels
 kernel_extent = 4           ## how far to extend kernel from center in std of the gaussian (sigma)
+pix_rank_cutoff = 0.15      ## fraction of pixels to be selected as location for feature with a given kernel
+min_dist_between_feats = 0.3 ## features closer than this many wavelengths are discarded
 
 ## read image
 image = cv2.imread(img_fpath)                           ## 3 channels, uint8
@@ -33,7 +36,6 @@ frequencies = numpy.geomspace(min_sf, max_sf, num=n_sfs)
 orientations = numpy.arange(n_oris) * (pi/n_oris)
 ori_freq_idx = list(itertools.product(range(n_oris), range(n_sfs)))
 
-## loop with indices instead to be able to index gain
 gain = numpy.full([n_oris, n_sfs, size, size], numpy.nan)
 for o, f in tqdm.tqdm(ori_freq_idx, desc='kernel gain'):
     wavelength = size / frequencies[f]
@@ -54,4 +56,30 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='kernel gain'):
     gain[o, f, :, :] = numpy.abs(filt_real + 1j * filt_imag)
 
 for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
-    pass
+    wavelength = size / frequencies[f]
+
+    ## a) pixels above threshold for this kernel
+    kernel_pix_ranks = rankdata(gain[o, f, :, :]).reshape([size, size])
+    kernel_top_pix = kernel_pix_ranks < pix_rank_cutoff * (size ** 2)
+    best_ori = gain[:, f, :, :].argmax(axis=0)
+    X, Y = numpy.where(kernel_top_pix & (best_ori==o))
+
+    ## b) local maxima
+    maxima = []
+    max_iterations = kernel_top_pix.sum()
+    remaining = numpy.full_like(X, True, dtype=bool) #  remaining
+    for _ in range(max_iterations):
+        if ~remaining.any():
+            break
+        new_peak_index = gain[o, f, X[remaining], Y[remaining]].argmax()
+        new_peak_coords = (X[remaining][new_peak_index], Y[remaining][new_peak_index])
+        maxima.append(new_peak_coords)
+        remaining_coords = numpy.array([X[remaining], Y[remaining]]).T
+        dists = scipy.spatial.distance.cdist(
+            numpy.atleast_2d(new_peak_coords),
+            remaining_coords
+        )
+        too_close = numpy.squeeze(dists) <= (wavelength * min_dist_between_feats)
+        remaining[remaining] = ~too_close
+    else:
+        raise ValueError('No convergence when finding local maxima')
