@@ -5,7 +5,7 @@ very useful: http://matlabserver.cs.rug.nl/edgedetectionweb/web/edgedetection_pa
 scale of kernel values wrt image also important
 
 todo:
-- restrict theta to 180 degrees
+
 
 TO READ: https://stackoverflow.com/q/61317974/708221
 
@@ -20,18 +20,24 @@ import matplotlib.pyplot as plt
 from os.path import join
 import itertools
 
+## settings
 plotdir = 'plots'
-img = cv2.imread('images/dog_200.png')   ## 3 channels, uint8
-img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255 ## 1 channel
+img_fpath = 'images/dog_200.png'
+n_sfs = 12
+n_oris = 6
 
-n_sfs = 10
-n_oris = 8
-start = 1.5
-stop = 40
-# sig_factor = 0.3 # 0.56
-thetas = numpy.arange(n_oris) * (pi/4)
-sfs = numpy.geomspace(start, stop, num=10)
+## read image
+img = cv2.imread(img_fpath)     ## 3 channels, uint8
+img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)/255
+
+## derived settings
 size = img.shape[0]
+min_sf = 1.5                    ## lowest spatial frequency
+max_sf = size / 4               ## highest spatial frequency: 4 pixel wavelength
+sfs = numpy.geomspace(min_sf, max_sf, num=n_sfs)
+bandwidth_constant = 0.56
+thetas = numpy.arange(n_oris) * (pi/n_oris)
+
 
 features = list(itertools.product(thetas, sfs))
 for f, (theta, sf) in enumerate(features):
@@ -40,14 +46,14 @@ for f, (theta, sf) in enumerate(features):
     ## parameters
     theta = theta           ##  Orientation of the normal to the parallel stripes of a Gabor function.
     lambd = size/sf         ##  Wavelength of the sinusoidal factor.
-    sigma = 0.56*lambd  # 0.56   ##  Standard deviation of the gaussian envelope. 0.56*lambd
+    sigma = lambd * bandwidth_constant   ##  Standard deviation of the gaussian envelope. 0.56*lambd
     kside = 1 + (16 * int(ceil(lambd))) ##  Size of the filter returned. should be a fn of sigma & lambda
     gamma = 0.5             ##  Spatial aspect ratio. ("ellipsicity") 1 is round, 0 straight line
-    psi = 0                 ##  Phase offset.
+    psi = 0                 ##  Phase offset of sinusoidal.
     ktype = cv2.CV_32F      ##  Type of filter coefficients. It can be CV_32F or CV_64F .(float32)
 
     kernel = cv2.getGaborKernel((kside, kside), sigma, theta, lambd, gamma, psi, ktype)
-    kernel /= numpy.sqrt((kernel * kernel).sum())
+    # kernel /= numpy.sqrt((kernel * kernel).sum())
 
     ## filter
     filt_img = cv2.filter2D(img, -1, kernel)
