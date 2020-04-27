@@ -103,3 +103,32 @@ for feature in tqdm.tqdm(features.itertuples(), desc='construct features'):
     kernel = cv2.getGaborKernel(psi=0, **kernel_params)
     gabor = reframe(kernel, width=size, height=size, x=feature.x, y=feature.y)
     gaborvects[f, :] = gabor.ravel()
+
+print('determine explained variance by feature..')
+## TODO: naming
+betas = gaborvects @ image.ravel()
+GabArea = numpy.sum(numpy.abs(gaborvects), axis=1)
+explVar = betas / GabArea
+ExplVarRanking = numpy.flip(numpy.argsort(explVar))
+features['ExplVarRanking'] = ExplVarRanking
+
+## selection
+SelGabs = numpy.full_like(ExplVarRanking, False, dtype=bool)
+imgVector = image.ravel()
+SelGabs[ExplVarRanking[0]] = True # select first gabor
+SelGabsSum = gaborvects[SelGabs, :].sum(axis=0) # port: current approx #
+for i in tqdm.tqdm(range(1, ExplVarRanking.size), desc='selecting ranked gabors'):
+    test1 = SelGabsSum
+    test2 = SelGabsSum + gaborvects[ExplVarRanking[i], :]
+    test1_r = numpy.corrcoef(test1, imgVector)[0, 1]
+    test2_r = numpy.corrcoef(test2, imgVector)[0, 1]
+    if not (test1_r >= test2_r):
+        SelGabs[ExplVarRanking[i]] = True
+        SelGabsSum = test2
+
+## display result
+reconstructed = SelGabsSum.reshape([size, size])
+fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True)
+axes[0].imshow(reconstructed, cmap='gray')
+axes[1].imshow(image, cmap='gray', vmin=0, vmax=1)
+plt.show()
