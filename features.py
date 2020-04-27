@@ -118,14 +118,14 @@ selection = numpy.full_like(expl_var_ranks, False, dtype=bool)
 img_vect = image.ravel()
 selection[expl_var_ranks[0]] = True   ## select first gabor
 recon_vect = gabor_vects[selection, :].sum(axis=0)
+recon_r = numpy.corrcoef(recon_vect, img_vect)[0, 1]
 for i in tqdm.tqdm(range(1, expl_var_ranks.size), desc='selecting ranked gabors'):
-    test1 = recon_vect
-    test2 = recon_vect + gabor_vects[expl_var_ranks[i], :]
-    test1_r = numpy.corrcoef(test1, img_vect)[0, 1]
-    test2_r = numpy.corrcoef(test2, img_vect)[0, 1]
-    if not (test1_r >= test2_r):
+    new_recon_vect = recon_vect + gabor_vects[expl_var_ranks[i], :]
+    new_r = numpy.corrcoef(new_recon_vect, img_vect)[0, 1]
+    if new_r > recon_r:
         selection[expl_var_ranks[i]] = True
-        recon_vect = test2
+        recon_vect = new_recon_vect
+        recon_r = new_r
 features['selected'] = selection
 
 ## display result
