@@ -2,8 +2,6 @@
 
 Python implementation of ModelImageWithSmallGaborSet
 
-to check:
--  X & Y probably reversed!! first index is rows, second cols
 """
 # pylint: disable=no-member
 import cv2, numpy, tqdm, scipy.spatial, pandas
@@ -27,8 +25,8 @@ min_sf = 1.5                ## lowest spatial frequency in cyles / image
 gamma = 0.5                 ## spatial aspect ratio a.k.a "ellipsicity"; 1 is round, 0 straight line
 min_wavelength_pix = 4      ## smallest wavelength in pixels
 kernel_extent = 4           ## how far to extend kernel from center in std of the gaussian (sigma)
-pix_fraction = 0.15      ## fraction of pixels to be selected as location for feature with a given kernel
-min_dist_between_feats = 0.3 ## features closer than this many wavelengths are discarded
+pix_fraction = 0.15         ## fraction of pixels to be selected as location for feature with a given kernel
+min_dist_between = 0.3      ## features closer than this many wavelengths are discarded
 
 ## read image
 image = cv2.imread(img_fpath)                           ## 3 channels, uint8
@@ -86,13 +84,13 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
             numpy.atleast_2d([x, y]),
             remaining_coords
         )
-        too_close = numpy.squeeze(dists) <= (wavelength * min_dist_between_feats)
+        too_close = numpy.squeeze(dists) <= (wavelength * min_dist_between)
         remaining[remaining] = ~too_close
     else:
         raise ValueError('No convergence when finding local maxima')
 
 features = pandas.DataFrame(features)
-gaborvects = numpy.full([features.shape[0], size**2], numpy.nan)
+gabor_vects = numpy.full([features.shape[0], size**2], numpy.nan)
 for feature in tqdm.tqdm(features.itertuples(), desc='construct features'):
     f = feature.Index
     kside = 1 + 2 * int(ceil(kernel_extent * feature.sigma))
@@ -106,32 +104,32 @@ for feature in tqdm.tqdm(features.itertuples(), desc='construct features'):
     )
     kernel = cv2.getGaborKernel(psi=0, **kernel_params)
     gabor = reframe(kernel, width=size, height=size, x=feature.x, y=feature.y)
-    gaborvects[f, :] = gabor.flatten()
+    gabor_vects[f, :] = gabor.flatten()
 
 print('determine explained variance by feature..')
-## TODO: naming
-betas = gaborvects @ image.flatten()
-GabArea = numpy.sum(numpy.abs(gaborvects), axis=1)
-explVar = betas / GabArea
-ExplVarRanking = numpy.flip(numpy.argsort(explVar))
-features['ExplVarRanking'] = ExplVarRanking
+covs = gabor_vects @ image.flatten()
+areas = numpy.sum(numpy.abs(gabor_vects), axis=1)
+expl_var = covs / areas
+expl_var_ranks = numpy.flip(numpy.argsort(expl_var))
+features['expl_var_rank'] = expl_var_ranks
 
 ## selection
-SelGabs = numpy.full_like(ExplVarRanking, False, dtype=bool)
-imgVector = image.flatten()
-SelGabs[ExplVarRanking[0]] = True   ## select first gabor
-SelGabsSum = gaborvects[SelGabs, :].sum(axis=0)
-for i in tqdm.tqdm(range(1, ExplVarRanking.size), desc='selecting ranked gabors'):
-    test1 = SelGabsSum
-    test2 = SelGabsSum + gaborvects[ExplVarRanking[i], :]
-    test1_r = numpy.corrcoef(test1, imgVector)[0, 1]
-    test2_r = numpy.corrcoef(test2, imgVector)[0, 1]
+selection = numpy.full_like(expl_var_ranks, False, dtype=bool)
+img_vect = image.ravel()
+selection[expl_var_ranks[0]] = True   ## select first gabor
+recon_vect = gabor_vects[selection, :].sum(axis=0)
+for i in tqdm.tqdm(range(1, expl_var_ranks.size), desc='selecting ranked gabors'):
+    test1 = recon_vect
+    test2 = recon_vect + gabor_vects[expl_var_ranks[i], :]
+    test1_r = numpy.corrcoef(test1, img_vect)[0, 1]
+    test2_r = numpy.corrcoef(test2, img_vect)[0, 1]
     if not (test1_r >= test2_r):
-        SelGabs[ExplVarRanking[i]] = True
-        SelGabsSum = test2
+        selection[expl_var_ranks[i]] = True
+        recon_vect = test2
+features['selected'] = selection
 
 ## display result
-reconstructed = SelGabsSum.reshape([size, size]) # , order='F'
+reconstructed = recon_vect.reshape([size, size])
 fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True)
 axes[0].imshow(reconstructed, cmap='gray')
 axes[1].imshow(image, cmap='gray', vmin=0, vmax=1)
