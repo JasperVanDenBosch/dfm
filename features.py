@@ -66,6 +66,7 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
     kernel_top_pix = kernel_pix_ranks < pix_rank_cutoff * (size ** 2)
     best_ori = gain[:, f, :, :].argmax(axis=0)
     X, Y = numpy.where(kernel_top_pix & (best_ori==o))
+    ## TODO X & Y probably reversed!! first index is rows, second cols
 
     ## b) local maxima
     max_iterations = kernel_top_pix.sum()
@@ -88,7 +89,8 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
 
 features = pandas.DataFrame(features)
 gaborvects = numpy.full([features.shape[0], size**2], numpy.nan)
-for f, feature in tqdm.tqdm(features.iterrows(), desc='construct features'):
+for feature in tqdm.tqdm(features.itertuples(), desc='construct features'):
+    f = feature.Index
     kside = 1 + 2 * int(ceil(kernel_extent * feature.sigma))
     kernel_params = dict(
         ksize=(kside, kside),

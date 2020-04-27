@@ -100,3 +100,21 @@ class ReframeTests(TestCase):
         print('')
         pprint(out)
         assert_array_equal(out, expected)
+
+    def test_smaller_even_output(self):
+        from dfm.reframe import reframe
+        a = numpy.array([
+            [1, 1, 1],
+            [1, 2, 1],
+            [1, 1, 1]
+        ])
+        expected = numpy.array([
+            [0, 0, 0, 0],
+            [0, 1, 1, 1],
+            [0, 1, 2, 1],
+            [0, 1, 1, 1],
+        ])
+        out = reframe(a, width=4, height=4, x=2, y=2)
+        print('')
+        pprint(out)
+        assert_array_equal(out, expected)

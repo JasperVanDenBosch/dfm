@@ -29,5 +29,5 @@ def reframe(a, width=100, height=100, x=0, y=0):
     assert height > 0
     y_extent, x_extent = [int((dim_size - 1) / 2) for dim_size in a.shape]
     canvas = numpy.zeros([height + 2 * y_extent, width + 2 * x_extent])
-    canvas[y: y + a.shape[1], x: x + a.shape[0]] = a
+    canvas[y: y + a.shape[0], x: x + a.shape[1]] = a
     return canvas[y_extent: y_extent + height, x_extent: x_extent + width]
