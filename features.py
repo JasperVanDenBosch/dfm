@@ -9,6 +9,7 @@ from numpy import pi, ceil
 import matplotlib.pyplot as plt
 from os.path import join
 import itertools
+from dfm.reframe import reframe
 
 ## settings
 plotdir = 'plots'
@@ -98,11 +99,5 @@ for f, feature in tqdm.tqdm(features.iterrows(), desc='construct features'):
         ktype=cv2.CV_32F
     )
     kernel = cv2.getGaborKernel(psi=0, **kernel_params)
-
-    canvas = numpy.zeros([size, size])
-    offset = abs(int((size-(kside-1))/2)) ## this only works if size is even
-    if kside < size:
-        canvas[offset-1:-offset, offset-1:-offset] = kernel
-    else:
-        canvas = kernel[offset:-offset, offset:-offset]
-    gaborvects[f, :] = canvas.ravel()
+    gabor = reframe(kernel, width=size, height=size, x=feature.x, y=feature.y)
+    gaborvects[f, :] = gabor.ravel()

@@ -20,7 +20,7 @@ class ReframeTests(TestCase):
             [0, 1, 1, 1, 0],
             [0, 0, 0, 0, 0],
         ])
-        out = reframe(a, width=5, height=5)
+        out = reframe(a, width=5, height=5, x=2, y=2)
         print('')
         pprint(out)
         assert_array_equal(out, expected)
@@ -39,7 +39,7 @@ class ReframeTests(TestCase):
             [2, 3, 2],
             [2, 2, 2]
         ])
-        out = reframe(a, width=3, height=3)
+        out = reframe(a, width=3, height=3, x=1, y=1)
         print('')
         pprint(out)
         assert_array_equal(out, expected)
@@ -96,7 +96,7 @@ class ReframeTests(TestCase):
             [0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0],
         ])
-        out = reframe(a, width=3, height=3, x=4, y=1)
+        out = reframe(a, width=5, height=5, x=4, y=1)
         print('')
         pprint(out)
         assert_array_equal(out, expected)
