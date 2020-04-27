@@ -1,6 +1,9 @@
 """features.py
 
 Python implementation of ModelImageWithSmallGaborSet
+
+to check:
+-  X & Y probably reversed!! first index is rows, second cols
 """
 # pylint: disable=no-member
 import cv2, numpy, tqdm, scipy.spatial, pandas
@@ -14,6 +17,7 @@ from dfm.reframe import reframe
 ## settings
 plotdir = 'plots'
 img_fpath = 'images/dog_200.png'
+# img_fpath = 'images/beach_400-200.png'
 n_sfs = 12
 n_oris = 6
 
@@ -23,7 +27,7 @@ min_sf = 1.5                ## lowest spatial frequency in cyles / image
 gamma = 0.5                 ## spatial aspect ratio a.k.a "ellipsicity"; 1 is round, 0 straight line
 min_wavelength_pix = 4      ## smallest wavelength in pixels
 kernel_extent = 4           ## how far to extend kernel from center in std of the gaussian (sigma)
-pix_rank_cutoff = 0.15      ## fraction of pixels to be selected as location for feature with a given kernel
+pix_fraction = 0.15      ## fraction of pixels to be selected as location for feature with a given kernel
 min_dist_between_feats = 0.3 ## features closer than this many wavelengths are discarded
 
 ## read image
@@ -63,18 +67,18 @@ for o, f in tqdm.tqdm(ori_freq_idx, desc='local selection'):
 
     ## a) pixels above threshold for this kernel
     kernel_pix_ranks = rankdata(gain[o, f, :, :]).reshape([size, size])
-    kernel_top_pix = kernel_pix_ranks < pix_rank_cutoff * (size ** 2)
+    pix_rank_cutoff = (1 - pix_fraction) * (size ** 2)
+    kernel_top_pix = kernel_pix_ranks > pix_rank_cutoff
     best_ori = gain[:, f, :, :].argmax(axis=0)
-    X, Y = numpy.where(kernel_top_pix & (best_ori==o))
-    ## TODO X & Y probably reversed!! first index is rows, second cols
-
+    Y, X = numpy.where(kernel_top_pix & (best_ori==o))
+    
     ## b) local maxima
     max_iterations = kernel_top_pix.sum()
     remaining = numpy.full_like(X, True, dtype=bool) #  remaining
     for _ in range(max_iterations):
         if ~remaining.any():
             break
-        new_peak_index = gain[o, f, X[remaining], Y[remaining]].argmax()
+        new_peak_index = gain[o, f, Y[remaining], X[remaining]].argmax()
         x, y = (X[remaining][new_peak_index], Y[remaining][new_peak_index])
         features.append(dict(o=o, f=f, theta=orientations[o], lambd=wavelength, sigma=gaussian_std, x=x, y=y))
         remaining_coords = numpy.array([X[remaining], Y[remaining]]).T
@@ -102,11 +106,11 @@ for feature in tqdm.tqdm(features.itertuples(), desc='construct features'):
     )
     kernel = cv2.getGaborKernel(psi=0, **kernel_params)
     gabor = reframe(kernel, width=size, height=size, x=feature.x, y=feature.y)
-    gaborvects[f, :] = gabor.ravel()
+    gaborvects[f, :] = gabor.flatten()
 
 print('determine explained variance by feature..')
 ## TODO: naming
-betas = gaborvects @ image.ravel()
+betas = gaborvects @ image.flatten()
 GabArea = numpy.sum(numpy.abs(gaborvects), axis=1)
 explVar = betas / GabArea
 ExplVarRanking = numpy.flip(numpy.argsort(explVar))
@@ -114,9 +118,9 @@ features['ExplVarRanking'] = ExplVarRanking
 
 ## selection
 SelGabs = numpy.full_like(ExplVarRanking, False, dtype=bool)
-imgVector = image.ravel()
-SelGabs[ExplVarRanking[0]] = True # select first gabor
-SelGabsSum = gaborvects[SelGabs, :].sum(axis=0) # port: current approx #
+imgVector = image.flatten()
+SelGabs[ExplVarRanking[0]] = True   ## select first gabor
+SelGabsSum = gaborvects[SelGabs, :].sum(axis=0)
 for i in tqdm.tqdm(range(1, ExplVarRanking.size), desc='selecting ranked gabors'):
     test1 = SelGabsSum
     test2 = SelGabsSum + gaborvects[ExplVarRanking[i], :]
@@ -127,7 +131,7 @@ for i in tqdm.tqdm(range(1, ExplVarRanking.size), desc='selecting ranked gabors'
         SelGabsSum = test2
 
 ## display result
-reconstructed = SelGabsSum.reshape([size, size])
+reconstructed = SelGabsSum.reshape([size, size]) # , order='F'
 fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True)
 axes[0].imshow(reconstructed, cmap='gray')
 axes[1].imshow(image, cmap='gray', vmin=0, vmax=1)
